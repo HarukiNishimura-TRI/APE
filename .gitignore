@@ -47,6 +47,7 @@ _darcs
 # project dirs
 /ape/model_zoo/configs
 /datasets/*
+!/datasets/tools
 !/datasets/*.*
 /projects/*/datasets
 /models
