@@ -261,7 +261,7 @@ $DETECTRON2_DATASETS/
 
 After download, update json files by runing
 ```
-python3 datasets/tools/odinw/convert.py
+python3 datasets/tools/odinw/convert.py --odinw_path datasets/odinw/
 ```
 
 This is because
