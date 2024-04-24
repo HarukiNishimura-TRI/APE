@@ -20,8 +20,8 @@ def main(args):
     odinw_path = Path(args.odinw_path)
     for dirpath, _, files in os.walk(odinw_path):
         for filename in files:
-            # Check if the file ends with '_annotations.coco.json'
-            if filename.endswith("coco.json"):
+            # Check if the file ends with '_annotations.coco.json' or 'annotations_without_background.json'
+            if filename.endswith("coco.json") or filename.endswith("background.json"):
                 # Modify the json file
                 json_file = os.path.join(dirpath, filename)
                 print("Open \t", json_file)
@@ -49,9 +49,7 @@ def main(args):
                 json_data["annotations"] = annotations
 
                 if "_converted.json" not in filename:
-                    json_file = os.path.join(
-                        dirpath, filename.replace(".json", "_converted.json")
-                    )
+                    json_file = os.path.join(dirpath, filename.replace(".json", "_converted.json"))
                 else:
                     json_file = os.path.join(dirpath, filename)
                 print("Save \t", json_file)
@@ -63,4 +61,3 @@ def main(args):
 
 if __name__ == "__main__":
     main(parse_args())
-
