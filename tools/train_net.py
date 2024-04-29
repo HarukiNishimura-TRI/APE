@@ -10,6 +10,7 @@ few common configuration parameters currently defined in "configs/common/train.p
 To add more complicated training logic, you can easily add other configs
 in the config file and implement a new train_net.py to handle them.
 """
+
 import logging
 import os
 import random
@@ -26,6 +27,8 @@ from ape.checkpoint import DetectionCheckpointer
 from ape.engine import SimpleTrainer
 from ape.evaluation import inference_on_dataset
 from detectron2.config import LazyConfig, instantiate
+from detectron2.data import DatasetCatalog, MetadataCatalog
+from detectron2.data.datasets import register_coco_instances, register_lvis_instances
 from detectron2.engine import default_argument_parser  # SimpleTrainer,
 from detectron2.engine import default_setup, hooks, launch
 from detectron2.engine.defaults import create_ddp_model
@@ -584,16 +587,20 @@ def do_train(args, cfg):
             hooks.IterationTimer(),
             ema.EMAHook(cfg, model) if cfg.train.model_ema.enabled else None,
             hooks.LRScheduler(scheduler=instantiate(cfg.lr_multiplier)),
-            hooks.PeriodicCheckpointer(checkpointer, **cfg.train.checkpointer)
-            if comm.is_main_process()
-            else None,
+            (
+                hooks.PeriodicCheckpointer(checkpointer, **cfg.train.checkpointer)
+                if comm.is_main_process()
+                else None
+            ),
             hooks.EvalHook(cfg.train.eval_period, lambda: do_test(cfg, model)),
-            hooks.PeriodicWriter(
-                writers,
-                period=cfg.train.log_period,
-            )
-            if comm.is_main_process()
-            else None,
+            (
+                hooks.PeriodicWriter(
+                    writers,
+                    period=cfg.train.log_period,
+                )
+                if comm.is_main_process()
+                else None
+            ),
         ]
     )
 
@@ -608,6 +615,36 @@ def do_train(args, cfg):
 def main(args):
     cfg = LazyConfig.load(args.config_file)
     cfg = LazyConfig.apply_overrides(cfg, args.opts)
+
+    # Some workaround to apply post-hoc changes to "json_file" and "image_root" of eval metadata.
+    eval_metadata_dict = MetadataCatalog.get(cfg.dataloader.test.dataset.names).as_dict()
+    eval_dataset_name = eval_metadata_dict["name"]
+    eval_json_file = eval_metadata_dict["json_file"]
+    eval_image_root = eval_metadata_dict["image_root"]
+    if any(["eval_json_file" in opt for opt in args.opts]):
+        eval_json_file = [opt for opt in args.opts if "eval_json_file" in opt][0].split("=")[1]
+    if any(["eval_image_root" in opt for opt in args.opts]):
+        eval_image_root = [opt for opt in args.opts if "eval_image_root" in opt][0].split("=")[1]
+    MetadataCatalog.remove(eval_dataset_name)
+    DatasetCatalog.remove(eval_dataset_name)
+    del eval_metadata_dict["name"]
+    del eval_metadata_dict["json_file"]
+    del eval_metadata_dict["image_root"]
+    del eval_metadata_dict["evaluator_type"]
+    if "lvis" in eval_dataset_name:
+        register_lvis_instances(
+            name=eval_dataset_name,
+            metadata=eval_metadata_dict,
+            json_file=eval_json_file,
+            image_root=eval_image_root,
+        )
+    else:
+        register_coco_instances(
+            name=eval_dataset_name,
+            metadata=eval_metadata_dict,
+            json_file=eval_json_file,
+            image_root=eval_image_root,
+        )
 
     if "output_dir" in cfg.model:
         cfg.model.output_dir = cfg.train.output_dir

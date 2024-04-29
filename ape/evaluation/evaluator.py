@@ -8,6 +8,7 @@ from typing import List, Union
 
 import torch
 from torch import nn
+from torch.nn.parallel import DistributedDataParallel
 
 from detectron2.evaluation import DatasetEvaluator, DatasetEvaluators, inference_context
 from detectron2.utils.comm import get_world_size
@@ -89,30 +90,54 @@ def inference_on_dataset(
             evaluator.process(inputs, outputs)
             total_eval_time += time.perf_counter() - start_eval_time
 
-            if hasattr(model.module, "preprocess_time"):
-                total_preprocess_time += model.module.preprocess_time
-            if hasattr(model.module, "model_vision") and hasattr(
-                model.module.model_vision, "preprocess_time"
-            ):
-                total_preprocess_time += model.module.model_vision.preprocess_time
-            if hasattr(model.module, "backbone_time"):
-                total_backbone_time += model.module.backbone_time
-            if hasattr(model.module, "model_vision") and hasattr(
-                model.module.model_vision, "backbone_time"
-            ):
-                total_backbone_time += model.module.model_vision.backbone_time
-            if hasattr(model.module, "transformer_time"):
-                total_transformer_time += model.module.transformer_time
-            if hasattr(model.module, "model_vision") and hasattr(
-                model.module.model_vision, "transformer_time"
-            ):
-                total_transformer_time += model.module.model_vision.transformer_time
-            if hasattr(model.module, "postprocess_time"):
-                total_postprocess_time += model.module.postprocess_time
-            if hasattr(model.module, "model_vision") and hasattr(
-                model.module.model_vision, "postprocess_time"
-            ):
-                total_postprocess_time += model.module.model_vision.postprocess_time
+            if isinstance(model, DistributedDataParallel):
+                if hasattr(model.module, "preprocess_time"):
+                    total_preprocess_time += model.module.preprocess_time
+                if hasattr(model.module, "model_vision") and hasattr(
+                    model.module.model_vision, "preprocess_time"
+                ):
+                    total_preprocess_time += model.module.model_vision.preprocess_time
+                if hasattr(model.module, "backbone_time"):
+                    total_backbone_time += model.module.backbone_time
+                if hasattr(model.module, "model_vision") and hasattr(
+                    model.module.model_vision, "backbone_time"
+                ):
+                    total_backbone_time += model.module.model_vision.backbone_time
+                if hasattr(model.module, "transformer_time"):
+                    total_transformer_time += model.module.transformer_time
+                if hasattr(model.module, "model_vision") and hasattr(
+                    model.module.model_vision, "transformer_time"
+                ):
+                    total_transformer_time += model.module.model_vision.transformer_time
+                if hasattr(model.module, "postprocess_time"):
+                    total_postprocess_time += model.module.postprocess_time
+                if hasattr(model.module, "model_vision") and hasattr(
+                    model.module.model_vision, "postprocess_time"
+                ):
+                    total_postprocess_time += model.module.model_vision.postprocess_time
+            else:
+                if hasattr(model, "preprocess_time"):
+                    total_preprocess_time += model.preprocess_time
+                if hasattr(model, "model_vision") and hasattr(
+                    model.model_vision, "preprocess_time"
+                ):
+                    total_preprocess_time += model.model_vision.preprocess_time
+                if hasattr(model, "backbone_time"):
+                    total_backbone_time += model.backbone_time
+                if hasattr(model, "model_vision") and hasattr(model.model_vision, "backbone_time"):
+                    total_backbone_time += model.model_vision.backbone_time
+                if hasattr(model, "transformer_time"):
+                    total_transformer_time += model.transformer_time
+                if hasattr(model, "model_vision") and hasattr(
+                    model.model_vision, "transformer_time"
+                ):
+                    total_transformer_time += model.model_vision.transformer_time
+                if hasattr(model, "postprocess_time"):
+                    total_postprocess_time += model.postprocess_time
+                if hasattr(model, "model_vision") and hasattr(
+                    model.model_vision, "postprocess_time"
+                ):
+                    total_postprocess_time += model.model_vision.postprocess_time
 
             iters_after_start = idx + 1 - num_warmup * int(idx >= num_warmup)
             data_seconds_per_iter = total_data_time / iters_after_start
